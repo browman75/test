@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>學生登錄表</title>
+<style>
+  body { font-family: sans-serif; background: #f2f7ff; text-align: center; padding: 40px; }
+  form { background: white; display: inline-block; padding: 30px; border-radius: 15px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+  input { margin: 10px; padding: 10px; width: 200px; border: 1px solid #ccc; border-radius: 8px; }
+  button { margin-top: 15px; padding: 10px 25px; border: none; background: #007bff; color: white; border-radius: 8px; cursor: pointer; }
+  button:hover { background: #0056c7; }
+</style>
+</head>
+<body>
+
+<h2>學生登錄表</h2>
+<form id="studentForm">
+  <input type="text" name="class" placeholder="班級" required><br>
+  <input type="text" name="number" placeholder="座號" required><br>
+  <input type="text" name="student_id" placeholder="學號" required><br>
+  <button type="submit">送出</button>
+</form>
+
+<script>
+const scriptURL = 'https://script.google.com/macros/s/AKfycbyVgvTBGRefCYtEaWGIxXFxyvUg9PTsewgMDRhDLhwBDcL02R2b2fmY-Q2ntVS_k4-lEQ/exec
+'; // ← 改成你自己的 Apps Script 網址
+const SECRET_TOKEN = 'mymymy'; // ← 改成和 GAS 相同的 token
+
+document.getElementById('studentForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const form = e.target;
+  const data = {
+    class: form.class.value.trim(),
+    number: form.number.value.trim(),
+    student_id: form.student_id.value.trim(),
+    token: SECRET_TOKEN
+  };
+
+  fetch(scriptURL, {
+    method: 'POST',
+    body: JSON.stringify(data),
+    headers: { 'Content-Type': 'application/json' }
+  })
+  .then(res => res.text())
+  .then(txt => {
+    if (txt === "OK") {
+      alert('資料已成功送出！');
+      form.reset();
+    } else {
+      alert('送出失敗，請稍後再試。\n\n伺服器回應：' + txt);
+    }
+  })
+  .catch(err => alert('傳送時發生錯誤：' + err));
+});
+</script>
+
+</body>
+</html>
