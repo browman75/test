@@ -26,7 +26,7 @@
     <input type="checkbox" id="windToggle"> 開啟風
   </label>
   <label>風速:
-    <input type="range" id="wind" min="0" max="5" value="0" disabled>
+    <input type="range" id="wind" min="0" max="5" step="0.5" value="0" disabled>
   </label>
   <button id="reset">重置</button>
 </div>
@@ -42,6 +42,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
+// ====== 模擬設定 ======
 const simCanvas = document.getElementById("simCanvas");
 const ctx = simCanvas.getContext("2d");
 const tempSlider = document.getElementById("temp");
@@ -55,12 +56,12 @@ let particles = [];
 const numParticles = 150;
 let frameCount = 0;
 
-// 初始化粒子
+// ====== 初始化粒子 ======
 function resetParticles() {
   particles = [];
   for (let i = 0; i < numParticles; i++) {
     particles.push({
-      x: Math.random() * simCanvas.width / 2,
+      x: Math.random() * simCanvas.width / 2, // 左側初始
       y: Math.random() * simCanvas.height,
       vx: (Math.random() - 0.5) * 2,
       vy: (Math.random() - 0.5) * 2,
@@ -75,7 +76,7 @@ function resetParticles() {
 }
 resetParticles();
 
-// 建立圖表
+// ====== 建立圖表 ======
 const chartCtx = document.getElementById('chartCanvas').getContext('2d');
 const chart = new Chart(chartCtx, {
   type: 'line',
@@ -96,13 +97,16 @@ const chart = new Chart(chartCtx, {
   }
 });
 
+// ====== 動畫更新 ======
 function update() {
   const temp = parseFloat(tempSlider.value);
   const size = parseFloat(sizeSlider.value);
   const windEnabled = windToggle.checked;
   const wind = windEnabled ? parseFloat(windSlider.value) : 0;
 
+  // 風速控制
   windSlider.disabled = !windEnabled;
+  if (!windEnabled) windSlider.value = 0;
 
   ctx.clearRect(0, 0, simCanvas.width, simCanvas.height);
 
@@ -110,18 +114,18 @@ function update() {
   let rightCount = 0;
 
   for (let p of particles) {
-    // 溫度影響：隨機速度振幅
-    p.vx += (Math.random() - 0.5) * 0.2 * temp;
-    p.vy += (Math.random() - 0.5) * 0.2 * temp;
+    // 溫度 → 隨機運動幅度
+    p.vx += (Math.random() - 0.5) * 0.3 * temp;
+    p.vy += (Math.random() - 0.5) * 0.3 * temp;
 
-    // 外力風影響（右吹）
-    p.vx += wind * 0.05;
+    // 外力 → 風
+    p.vx += wind * 0.1;
 
-    // 分子大小影響速度
+    // 分子大小 → 慣性阻力
     p.vx *= (1 - size * 0.03);
     p.vy *= (1 - size * 0.03);
 
-    // 移動
+    // 更新位置
     p.x += p.vx;
     p.y += p.vy;
 
@@ -131,7 +135,8 @@ function update() {
     if (p.y < 0) { p.y = 0; p.vy *= -1; }
     if (p.y > simCanvas.height) { p.y = simCanvas.height; p.vy *= -1; }
 
-    if (p.x < simCanvas.width/2) leftCount++;
+    // 計算左右分布
+    if (p.x < simCanvas.width / 2) leftCount++;
     else rightCount++;
 
     // 畫粒子
@@ -141,10 +146,10 @@ function update() {
     ctx.fill();
   }
 
-  // 顯示文字資訊
-  stats.textContent = `左側: ${leftCount} 顆 | 右側: ${rightCount} 顆 | 差值: ${Math.abs(leftCount - rightCount)} | 風速: ${windEnabled ? wind : 0}`;
+  // 顯示資訊
+  stats.textContent = `左側: ${leftCount} 顆 | 右側: ${rightCount} 顆 | 風速: ${wind.toFixed(1)} (方向：→)`;
 
-  // 更新圖表（每 5 幀取樣一次）
+  // 更新圖表（每 5 幀）
   frameCount++;
   if (frameCount % 5 === 0) {
     const leftPercent = (leftCount / numParticles * 100).toFixed(1);
@@ -152,7 +157,7 @@ function update() {
     chart.data.labels.push(frameCount);
     chart.data.datasets[0].data.push(leftPercent);
     chart.data.datasets[1].data.push(rightPercent);
-    if (chart.data.labels.length > 80) { // 保持80筆資料
+    if (chart.data.labels.length > 80) { // 保留最近 80 筆資料
       chart.data.labels.shift();
       chart.data.datasets[0].data.shift();
       chart.data.datasets[1].data.shift();
