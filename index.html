@@ -1,59 +1,87 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-Hant">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>學生登錄表</title>
-<style>
-  body { font-family: sans-serif; background: #f2f7ff; text-align: center; padding: 40px; }
-  form { background: white; display: inline-block; padding: 30px; border-radius: 15px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-  input { margin: 10px; padding: 10px; width: 200px; border: 1px solid #ccc; border-radius: 8px; }
-  button { margin-top: 15px; padding: 10px 25px; border: none; background: #007bff; color: white; border-radius: 8px; cursor: pointer; }
-  button:hover { background: #0056c7; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>學習測驗網頁</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; border: 1px solid #ccc; border-radius: 10px; }
+        .success { color: green; font-weight: bold; }
+        .error { color: red; font-weight: bold; }
+    </style>
 </head>
 <body>
 
-<h2>學生登錄表</h2>
-<form id="studentForm">
-  <input type="text" name="class" placeholder="班級" required><br>
-  <input type="text" name="number" placeholder="座號" required><br>
-  <input type="text" name="student_id" placeholder="學號" required><br>
-  <button type="submit">送出</button>
-</form>
+    <h1>基礎測驗：1+1=?</h1>
+    
+    <form id="quizForm">
+        <label for="studentId">學號:</label>
+        <input type="text" id="studentId" name="學號" required><br><br>
 
-<script>
-const scriptURL = 'https://script.google.com/macros/s/AKfycbyVgvTBGRefCYtEaWGIxXFxyvUg9PTsewgMDRhDLhwBDcL02R2b2fmY-Q2ntVS_k4-lEQ/exec
-'; // ← 改成你自己的 Apps Script 網址
-const SECRET_TOKEN = 'mymymy'; // ← 改成和 GAS 相同的 token
+        <label for="answer">問題：1 + 1 = ?</label>
+        <input type="number" id="answer" name="答案" required><br><br>
 
-document.getElementById('studentForm').addEventListener('submit', e => {
-  e.preventDefault();
-  const form = e.target;
-  const data = {
-    class: form.class.value.trim(),
-    number: form.number.value.trim(),
-    student_id: form.student_id.value.trim(),
-    token: SECRET_TOKEN
-  };
+        <button type="submit">提交答案</button>
+    </form>
 
-  fetch(scriptURL, {
-    method: 'POST',
-    body: JSON.stringify(data),
-    headers: { 'Content-Type': 'application/json' }
-  })
-  .then(res => res.text())
-  .then(txt => {
-    if (txt === "OK") {
-      alert('資料已成功送出！');
-      form.reset();
-    } else {
-      alert('送出失敗，請稍後再試。\n\n伺服器回應：' + txt);
-    }
-  })
-  .catch(err => alert('傳送時發生錯誤：' + err));
-});
-</script>
+    <div id="message"></div>
+
+    <script>
+        // *** 將此處替換為您在第三步中取得的 Web App URL ***
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzXZWuDEMhSwHPRSTdEMp4c6WpwMhkAWfpnG86DJf9W20-gkWZFM5naSVkmsC75bBVEag/exec";
+        // *** 這是正確答案，只有答對才會提交資料 ***
+        const CORRECT_ANSWER = 2;
+
+        document.getElementById('quizForm').addEventListener('submit', function(e) {
+            e.preventDefault(); // 阻止表單傳統提交
+
+            const messageDiv = document.getElementById('message');
+            const studentIdInput = document.getElementById('studentId');
+            const answerInput = document.getElementById('answer');
+            
+            const studentId = studentIdInput.value.trim();
+            const submittedAnswer = parseInt(answerInput.value.trim());
+
+            if (submittedAnswer !== CORRECT_ANSWER) {
+                // 答案不正確，不發送資料，只顯示錯誤訊息
+                messageDiv.className = 'error';
+                messageDiv.textContent = '答案錯誤，請重新思考！';
+                return; 
+            }
+
+            // 答案正確，準備發送資料
+            messageDiv.className = '';
+            messageDiv.textContent = '答案正確，正在提交紀錄...';
+            
+            // 創建 FormData 物件，只包含要記錄到 Sheet 的資料
+            // 注意：Apps Script 的 doPost 只能處理 name 屬性的資料
+            const formData = new FormData();
+            formData.append('學號', studentId);
+            
+            // 使用 Fetch API 發送 POST 請求
+            fetch(WEB_APP_URL, {
+                method: 'POST',
+                body: formData // 將學號資料發送給 Apps Script
+            })
+            .then(response => {
+                // Apps Script 返回的內容不是標準的 JSON，通常需要特殊處理，
+                // 但 Apps Script 會正確記錄。這裡我們只檢查響應狀態碼
+                if (response.ok) {
+                    messageDiv.className = 'success';
+                    messageDiv.textContent = '恭喜！答案正確，學號已成功記錄！';
+                    // 答對並紀錄後清空表單
+                    document.getElementById('quizForm').reset();
+                } else {
+                    throw new Error('伺服器回傳錯誤代碼: ' + response.status);
+                }
+            })
+            .catch(error => {
+                // 網路錯誤或 Apps Script 程式碼錯誤
+                messageDiv.className = 'error';
+                messageDiv.textContent = '提交紀錄失敗，請檢查網路或稍後重試。錯誤詳情: ' + error.message;
+            });
+        });
+    </script>
 
 </body>
 </html>
