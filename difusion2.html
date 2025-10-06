@@ -2,93 +2,71 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <title>分子擴散與風的模擬器</title>
+  <title>氣體分子擴散與風力模擬器（Safari 修正版）</title>
   <style>
-    body { text-align:center; font-family: sans-serif; background: #f0f8ff; }
-    .controls { margin-top: 10px; }
-    label { margin: 0 10px; }
-    canvas { border: 1px solid #333; background: white; margin-top: 10px; }
-    #chartContainer { width: 800px; margin: 15px auto; }
+    body { text-align:center; font-family:sans-serif; background:#f0f8ff; }
+    canvas { border:1px solid #333; background:white; margin-top:10px; }
+    .controls { margin-top:10px; }
+    label { margin:0 8px; }
   </style>
 </head>
 <body>
-  <h2>氣體分子擴散 + 風力 模擬器</h2>
+  <h2>氣體分子擴散與風力模擬器</h2>
   <div class="controls">
     <label>溫度: <input type="range" id="temp" min="1" max="10" step="0.5" value="5"></label>
-    <label>分子大小: <input type="range" id="size" min="1" max="10" step="0.5" value="3"></label>
+    <label>分子大小: <input type="range" id="size" min="2" max="8" step="0.5" value="3"></label>
     <label><input type="checkbox" id="windToggle"> 開啟風</label>
     <label>風速: <input type="range" id="wind" min="0" max="5" step="0.2" value="0" disabled></label>
     <button id="reset">重置</button>
   </div>
   <canvas id="simCanvas" width="800" height="400"></canvas>
   <p id="stats"></p>
-  <div id="chartContainer">
-    <canvas id="chartCanvas" width="800" height="200"></canvas>
-  </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
-    const simCanvas = document.getElementById("simCanvas");
-    const ctx = simCanvas.getContext("2d");
+    const canvas = document.getElementById("simCanvas");
+    const ctx = canvas.getContext("2d");
     const tempSlider = document.getElementById("temp");
     const sizeSlider = document.getElementById("size");
     const windSlider = document.getElementById("wind");
     const windToggle = document.getElementById("windToggle");
-    const stats = document.getElementById("stats");
     const resetBtn = document.getElementById("reset");
+    const stats = document.getElementById("stats");
 
-    let particles = [];
     const numParticles = 200;
-    let frameCount = 0;
+    let particles = [];
 
     function resetParticles() {
       particles = [];
       for (let i = 0; i < numParticles; i++) {
-        // 用雙色：左半邊藍色，右半邊紅色
         let color, x0;
         if (i < numParticles / 2) {
-          color = "rgba(0, 0, 255, 0.7)";
-          x0 = Math.random() * (simCanvas.width / 2);
+          color = "blue";
+          x0 = Math.random() * (canvas.width / 2);
         } else {
-          color = "rgba(255, 0, 0, 0.7)";
-          // 初期右半邊
-          x0 = simCanvas.width / 2 + Math.random() * (simCanvas.width / 2);
+          color = "red";
+          x0 = canvas.width / 2 + Math.random() * (canvas.width / 2);
         }
         particles.push({
           x: x0,
-          y: Math.random() * simCanvas.height,
+          y: Math.random() * canvas.height,
           vx: (Math.random() - 0.5) * 2,
           vy: (Math.random() - 0.5) * 2,
           color: color
         });
       }
-      frameCount = 0;
-      chart.data.labels = [];
-      chart.data.datasets.forEach(ds => ds.data = []);
-      chart.update();
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawParticles();
     }
-    resetParticles();
 
-    // 建立圖表
-    const chartCtx = document.getElementById("chartCanvas").getContext("2d");
-    const chart = new Chart(chartCtx, {
-      type: 'line',
-      data: {
-        labels: [],
-        datasets: [
-          { label: '左側藍色分子比例(%)', borderColor: 'blue', data: [], fill: false },
-          { label: '右側紅色分子比例(%)', borderColor: 'red', data: [], fill: false }
-        ]
-      },
-      options: {
-        animation: false,
-        scales: {
-          y: { min: 0, max: 100, title: { display: true, text: '百分比 (%)' } },
-          x: { title: { display: true, text: '時間 (帧)' } }
-        },
-        plugins: { legend: { position: 'bottom' } }
+    function drawParticles() {
+      const size = parseFloat(sizeSlider.value);
+      for (const p of particles) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
+        ctx.fillStyle = p.color;
+        ctx.fill();
       }
-    });
+    }
 
     function update() {
       const temp = parseFloat(tempSlider.value);
@@ -99,75 +77,42 @@
       windSlider.disabled = !windEnabled;
       if (!windEnabled) windSlider.value = 0;
 
-      ctx.clearRect(0, 0, simCanvas.width, simCanvas.height);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      let leftBlue = 0, rightRed = 0;
-      let totalBlue = 0, totalRed = 0;
-
-      for (let p of particles) {
-        // 溫度：隨機擾動
+      for (const p of particles) {
+        // 分子運動
         p.vx += (Math.random() - 0.5) * temp * 0.2;
         p.vy += (Math.random() - 0.5) * temp * 0.2;
 
-        // 風力：水平推動
+        // 風力影響
         p.vx += wind * 0.1;
 
-        // 分子大小造成阻尼
-        let damping = (1 - size * 0.03);
+        // 阻尼（與粒子大小有關）
+        const damping = 1 - size * 0.03;
         p.vx *= damping;
         p.vy *= damping;
 
-        // 更新位置
         p.x += p.vx;
         p.y += p.vy;
 
         // 邊界反彈
         if (p.x < 0) { p.x = 0; p.vx *= -1; }
-        if (p.x > simCanvas.width) { p.x = simCanvas.width; p.vx *= -1; }
+        if (p.x > canvas.width) { p.x = canvas.width; p.vx *= -1; }
         if (p.y < 0) { p.y = 0; p.vy *= -1; }
-        if (p.y > simCanvas.height) { p.y = simCanvas.height; p.vy *= -1; }
-
-        // 計算分子比例：藍色 vs 紅色在左右兩邊
-        if (p.color.startsWith("rgba(0")) {
-          // 藍色分子
-          totalBlue++;
-          if (p.x < simCanvas.width / 2) leftBlue++;
-        } else {
-          // 紅色分子
-          totalRed++;
-          if (p.x > simCanvas.width / 2) rightRed++;
-        }
-
-        // 畫粒子
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
-        ctx.fillStyle = p.color;
-        ctx.fill();
+        if (p.y > canvas.height) { p.y = canvas.height; p.vy *= -1; }
       }
 
-      // 顯示文字統計
-      let leftBluePct = totalBlue ? (leftBlue / totalBlue * 100).toFixed(1) : 0;
-      let rightRedPct = totalRed ? (rightRed / totalRed * 100).toFixed(1) : 0;
-      stats.textContent = `藍色：左側 ${leftBluePct}% | 紅色：右側 ${rightRedPct}% | 風速：${wind.toFixed(1)}`;
+      drawParticles();
 
-      // 更新圖表：每 5 幀
-      frameCount++;
-      if (frameCount % 5 === 0) {
-        chart.data.labels.push(frameCount);
-        chart.data.datasets[0].data.push(parseFloat(leftBluePct));
-        chart.data.datasets[1].data.push(parseFloat(rightRedPct));
-        if (chart.data.labels.length > 80) {
-          chart.data.labels.shift();
-          chart.data.datasets.forEach(ds => ds.data.shift());
-        }
-        chart.update();
-      }
+      const left = particles.filter(p => p.x < canvas.width / 2).length;
+      const leftPct = (left / numParticles * 100).toFixed(1);
+      stats.textContent = `左側分子比例：${leftPct}%　|　風速：${wind.toFixed(1)}`;
 
       requestAnimationFrame(update);
     }
 
     resetBtn.onclick = resetParticles;
-
+    resetParticles();
     update();
   </script>
 </body>
