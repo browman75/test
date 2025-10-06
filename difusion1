@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>氣體分子擴散模擬器</title>
+<style>
+  body { text-align:center; font-family:sans-serif; background:#f0f8ff; }
+  canvas { border:1px solid #333; background:white; margin-top:10px; }
+  .controls { margin-top:10px; }
+  label { margin:0 5px; }
+</style>
+</head>
+<body>
+<h2>🌬️ 氣體分子擴散與外力模擬器</h2>
+<p>調整參數觀察分子擴散速率變化</p>
+
+<div class="controls">
+  <label>溫度: <input type="range" id="temp" min="1" max="10" value="5"></label>
+  <label>分子大小: <input type="range" id="size" min="1" max="10" value="3"></label>
+  <label>風速: <input type="range" id="wind" min="-5" max="5" value="0"></label>
+  <button id="reset">重置</button>
+</div>
+
+<canvas id="simCanvas" width="800" height="400"></canvas>
+<p id="stats"></p>
+
+<script>
+const canvas = document.getElementById("simCanvas");
+const ctx = canvas.getContext("2d");
+const tempSlider = document.getElementById("temp");
+const sizeSlider = document.getElementById("size");
+const windSlider = document.getElementById("wind");
+const stats = document.getElementById("stats");
+const resetBtn = document.getElementById("reset");
+
+let particles = [];
+const numParticles = 150;
+
+function resetParticles() {
+  particles = [];
+  for (let i = 0; i < numParticles; i++) {
+    particles.push({
+      x: Math.random() * canvas.width / 2, // 初始集中在左半
+      y: Math.random() * canvas.height,
+      vx: (Math.random() - 0.5) * 2,
+      vy: (Math.random() - 0.5) * 2,
+      color: "rgba(0,150,255,0.7)"
+    });
+  }
+}
+resetParticles();
+
+function update() {
+  const temp = parseFloat(tempSlider.value);
+  const size = parseFloat(sizeSlider.value);
+  const wind = parseFloat(windSlider.value);
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  let leftCount = 0;
+  let rightCount = 0;
+
+  for (let p of particles) {
+    p.vx += (Math.random() - 0.5) * 0.2 * temp;  // 溫度影響隨機速度變化
+    p.vy += (Math.random() - 0.5) * 0.2 * temp;
+    p.vx += wind * 0.05; // 風影響整體偏移
+
+    // 根據分子大小，速度衰減（大分子移動慢）
+    p.vx *= (1 - size * 0.03);
+    p.vy *= (1 - size * 0.03);
+
+    p.x += p.vx;
+    p.y += p.vy;
+
+    // 碰撞邊界反彈
+    if (p.x < 0) { p.x = 0; p.vx *= -1; }
+    if (p.x > canvas.width) { p.x = canvas.width; p.vx *= -1; }
+    if (p.y < 0) { p.y = 0; p.vy *= -1; }
+    if (p.y > canvas.height) { p.y = canvas.height; p.vy *= -1; }
+
+    // 計算左右分子數
+    if (p.x < canvas.width/2) leftCount++;
+    else rightCount++;
+
+    // 繪製粒子
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
+    ctx.fillStyle = p.color;
+    ctx.fill();
+  }
+
+  stats.textContent = `左側: ${leftCount} 顆 | 右側: ${rightCount} 顆 | 差值: ${Math.abs(leftCount - rightCount)}`;
+  requestAnimationFrame(update);
+}
+
+resetBtn.onclick = resetParticles;
+update();
+</script>
+</body>
+</html>
