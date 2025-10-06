@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>氣體分子擴散模擬器</title>
+<style>
+  body { text-align:center; font-family:sans-serif; background:#eef9ff; }
+  canvas { border:1px solid #333; background:white; margin-top:10px; }
+  .controls { margin-top:10px; }
+  label { margin:0 8px; }
+  #chartContainer { width:800px; margin:15px auto; }
+</style>
+</head>
+<body>
+<h2>🌬️ 氣體分子擴散與外力模擬器</h2>
+<p>觀察氣體分子布朗運動下的擴散現象，並比較外力（風）對擴散的影響。</p>
+
+<div class="controls">
+  <label>溫度:
+    <input type="range" id="temp" min="1" max="10" value="5">
+  </label>
+  <label>分子大小:
+    <input type="range" id="size" min="1" max="10" value="3">
+  </label>
+  <label>
+    <input type="checkbox" id="windToggle"> 開啟風
+  </label>
+  <label>風速:
+    <input type="range" id="wind" min="0" max="5" value="0" disabled>
+  </label>
+  <button id="reset">重置</button>
+</div>
+
+<canvas id="simCanvas" width="800" height="400"></canvas>
+<p id="stats"></p>
+
+<div id="chartContainer">
+  <canvas id="chartCanvas" width="800" height="200"></canvas>
+</div>
+
+<!-- 引入 Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+const simCanvas = document.getElementById("simCanvas");
+const ctx = simCanvas.getContext("2d");
+const tempSlider = document.getElementById("temp");
+const sizeSlider = document.getElementById("size");
+const windSlider = document.getElementById("wind");
+const windToggle = document.getElementById("windToggle");
+const stats = document.getElementById("stats");
+const resetBtn = document.getElementById("reset");
+
+let particles = [];
+const numParticles = 150;
+let frameCount = 0;
+
+// 初始化粒子
+function resetParticles() {
+  particles = [];
+  for (let i = 0; i < numParticles; i++) {
+    particles.push({
+      x: Math.random() * simCanvas.width / 2,
+      y: Math.random() * simCanvas.height,
+      vx: (Math.random() - 0.5) * 2,
+      vy: (Math.random() - 0.5) * 2,
+      color: "rgba(0,150,255,0.7)"
+    });
+  }
+  frameCount = 0;
+  chart.data.labels = [];
+  chart.data.datasets[0].data = [];
+  chart.data.datasets[1].data = [];
+  chart.update();
+}
+resetParticles();
+
+// 建立圖表
+const chartCtx = document.getElementById('chartCanvas').getContext('2d');
+const chart = new Chart(chartCtx, {
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [
+      { label: '左側分子比例 (%)', borderColor: 'blue', data: [], fill:false },
+      { label: '右側分子比例 (%)', borderColor: 'red', data: [], fill:false }
+    ]
+  },
+  options: {
+    animation: false,
+    scales: {
+      y: { min: 0, max: 100, title: { display: true, text: '比例 (%)' } },
+      x: { title: { display: true, text: '時間 (frame)' } }
+    },
+    plugins: { legend: { position: 'bottom' } }
+  }
+});
+
+function update() {
+  const temp = parseFloat(tempSlider.value);
+  const size = parseFloat(sizeSlider.value);
+  const windEnabled = windToggle.checked;
+  const wind = windEnabled ? parseFloat(windSlider.value) : 0;
+
+  windSlider.disabled = !windEnabled;
+
+  ctx.clearRect(0, 0, simCanvas.width, simCanvas.height);
+
+  let leftCount = 0;
+  let rightCount = 0;
+
+  for (let p of particles) {
+    // 溫度影響：隨機速度振幅
+    p.vx += (Math.random() - 0.5) * 0.2 * temp;
+    p.vy += (Math.random() - 0.5) * 0.2 * temp;
+
+    // 外力風影響（右吹）
+    p.vx += wind * 0.05;
+
+    // 分子大小影響速度
+    p.vx *= (1 - size * 0.03);
+    p.vy *= (1 - size * 0.03);
+
+    // 移動
+    p.x += p.vx;
+    p.y += p.vy;
+
+    // 邊界反彈
+    if (p.x < 0) { p.x = 0; p.vx *= -1; }
+    if (p.x > simCanvas.width) { p.x = simCanvas.width; p.vx *= -1; }
+    if (p.y < 0) { p.y = 0; p.vy *= -1; }
+    if (p.y > simCanvas.height) { p.y = simCanvas.height; p.vy *= -1; }
+
+    if (p.x < simCanvas.width/2) leftCount++;
+    else rightCount++;
+
+    // 畫粒子
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
+    ctx.fillStyle = p.color;
+    ctx.fill();
+  }
+
+  // 顯示文字資訊
+  stats.textContent = `左側: ${leftCount} 顆 | 右側: ${rightCount} 顆 | 差值: ${Math.abs(leftCount - rightCount)} | 風速: ${windEnabled ? wind : 0}`;
+
+  // 更新圖表（每 5 幀取樣一次）
+  frameCount++;
+  if (frameCount % 5 === 0) {
+    const leftPercent = (leftCount / numParticles * 100).toFixed(1);
+    const rightPercent = (rightCount / numParticles * 100).toFixed(1);
+    chart.data.labels.push(frameCount);
+    chart.data.datasets[0].data.push(leftPercent);
+    chart.data.datasets[1].data.push(rightPercent);
+    if (chart.data.labels.length > 80) { // 保持80筆資料
+      chart.data.labels.shift();
+      chart.data.datasets[0].data.shift();
+      chart.data.datasets[1].data.shift();
+    }
+    chart.update();
+  }
+
+  requestAnimationFrame(update);
+}
+
+resetBtn.onclick = resetParticles;
+update();
+</script>
+</body>
+</html>
